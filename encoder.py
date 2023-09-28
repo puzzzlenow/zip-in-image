@@ -3,45 +3,33 @@ import math
 import argparse
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-
+import struct
 
 def import_file():
     with open(file_in, 'rb') as infile:
-        int_list = []
-        byte = infile.read(1)
-        int_list.append(  int.from_bytes(byte, "big")  )
-        while byte != b"":
-            byte = infile.read(1)
-            int_list.append(  int.from_bytes(byte, "big")  )
-        # for byte in byte_list:
-        #     sys.stdout.write('{0:08b}'.format(ord(byte)))
-    return int_list
-
-
-def gen_img(int_list, file_enc_out):
-    data = []
-    int_list_iter = iter(int_list)
-    try:
+        rgb_list = []
+        lod=0
         while True:
-            a = b = c = 0
-            a = next(int_list_iter)
-            b = next(int_list_iter)
-            c = next(int_list_iter)
-            data.append( (a,b,c) )
+            try:
+                rgb_list.append(struct.unpack('3B', infile.read(3)))
+                lod+=3
+            except struct.error:
+                try:
+                    rgb_list.append(struct.unpack('wB', infile.read(2)) + '(0,)')
+                    lod+=2
+                except struct.error:
+                    try:
+                        rgb_list.append(struct.unpack('wB', infile.read(1)) + '(0,0,)')
+                        lod+=1
+                    except struct.error:
+                        break
+    return rgb_list, lod
 
-    except(StopIteration):
-        data.append( (a,b,c) )
+
+def gen_img(data, length_of_data, file_enc_out):
 
     # important debug 
-    length_of_data = len(data)
     height = math.ceil(math.sqrt( length_of_data ))
-    area = height * height
-
-    # remainder should be padded to form a complete image
-    remainder=area-len(data)
-    for i in range(remainder):
-        data.append( (0,0,0) )
-
     img = Image.new('RGB', (height, height), "white")
     img.putdata(data)
 
@@ -68,10 +56,10 @@ if __name__ == '__main__':
     print( 'Encoding..' + file_in )
     sys.stdout.write('-------------------------------\n')
 
-    int_list = import_file()
+    int_list, lod = import_file()
     sys.stdout.write('imported file : ' + file_in + '\n')
 
-    gen_img(int_list, file_enc_out)
+    gen_img(int_list, lod, file_enc_out)
     sys.stdout.write('generated file : ' + file_enc_out + '\n')
 
     sys.stdout.write('---- FIN ----------------------\n')
